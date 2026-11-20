@@ -445,11 +445,11 @@ function normalizeImdbId(value) {
   let id = String(value || "").trim();
 
   // Accept IMDb IDs with or without the "tt" prefix.
-  if (/^\\d{5,12}$/.test(id)) {
+  if (/^\d{5,12}$/.test(id)) {
     id = `tt${id}`;
   }
 
-  if (!/^tt\\d{5,12}$/i.test(id)) {
+  if (!/^tt\d{5,12}$/i.test(id)) {
     throw new Error("Invalid IMDb ID");
   }
 
@@ -862,7 +862,7 @@ async function handleApi(req, res, u) {
 
       // Prowlarr can pass IMDb IDs as a special query token.
       if (!imdbId) {
-        const match = q.match(/^\\{ImdbId:(tt\\d{5,12})\\}$/i);
+        const match = q.match(/^\{ImdbId:(tt\d{5,12})\}$/i);
         if (match) {
           imdbId = match[1];
           q = "";
@@ -2819,6 +2819,7 @@ module.exports = {
   xmlEscape,
   torznabCapsXml,
   buildSearchQuery,
+  normalizeImdbId,
   parseResults,
   setLimitedCache,
   fsCall,
