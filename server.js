@@ -698,7 +698,7 @@ function parseResults(html, req) {
     }
 
     const id = relPath.replace(RE.trailingSlash, "").split("-").pop();
-    if (!id || !/^\d+$/.test(id)) continue;
+    if (!id || !RE.digits.test(id)) continue;
 
     const tds = getTds(row);
 
@@ -980,7 +980,7 @@ async function handleDownload(req, res, u) {
   const relPath = u.searchParams.get("path") || "";
 
   if (
-    !/^\d+$/.test(id) ||
+    !RE.digits.test(id) ||
     !relPath ||
     !relPath.startsWith("/") ||
     relPath.startsWith("//") ||
