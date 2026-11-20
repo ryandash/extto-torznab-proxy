@@ -630,9 +630,9 @@ function parseDateToRfc822(s, nowMs = Date.now()) {
 }
 
 function categoryFromRow(row) {
-  if (/href=["']\/movies\//i.test(row)) return 2000;
-  if (/href=["']\/anime\//i.test(row)) return 5070;
-  if (/href=["']\/tv\//i.test(row)) return 5000;
+  if (RE.movieHref.test(row)) return 2000;
+  if (RE.animeHref.test(row)) return 5070;
+  if (RE.tvHref.test(row)) return 5000;
   return 7000;
 }
 
