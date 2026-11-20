@@ -5,6 +5,56 @@ const crypto = require("crypto");
 const { createSearchHelpers } = require("./lib/search");
 const { createSettingsHtml } = require("./lib/settings-page");
 
+const RE = Object.freeze({
+  trailingSlashes: /\/+$/,
+  xmlControlChars: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,
+  ampersands: /&/g,
+  lessThan: /</g,
+  greaterThan: />/g,
+  doubleQuotes: /"/g,
+  singleQuotes: /'/g,
+  nbsp: /&nbsp;/g,
+  decimalEntity: /&#(\d+);/g,
+  hexEntity: /&#x([0-9a-f]+);/gi,
+  apos: /&apos;/g,
+  quot: /&quot;/g,
+  lt: /&lt;/g,
+  gt: /&gt;/g,
+  amp: /&amp;/g,
+  scripts: /<script[\s\S]*?<\/script>/gi,
+  styles: /<style[\s\S]*?<\/style>/gi,
+  htmlTags: /<[^>]+>/g,
+  whitespace: /\s+/g,
+  searchTable: /<table[^>]*class=["'][^"']*search-table[^"']*["'][^>]*>[\s\S]*?<\/table>/i,
+  rows: /<tr\b[^>]*>[\s\S]*?<\/tr>/gi,
+  cells: /<td\b[^>]*>[\s\S]*?<\/td>/gi,
+  commas: /,/g,
+  size: /([\d.]+)\s*(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)/i,
+  relativeDate: /^(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|wk|wks|week|weeks|mo|mos|month|months|y|yr|yrs|year|years)(?:\s+ago)?$/i,
+  movieHref: /href=["']\/movies\//i,
+  animeHref: /href=["']\/anime\//i,
+  tvHref: /href=["']\/tv\//i,
+  anchors: /<a\b[^>]*>[\s\S]*?<\/a>/gi,
+  anchorOpen: /<a\b[^>]*>/i,
+  anchorClose: /<\/a>/i,
+  classWhitespace: /\s+/,
+  fallbackTorrentPath: /^\/.+-\d+\/?$/,
+  trailingSlash: /\/$/,
+  digits: /^\d+$/,
+  number: /\d+/,
+  pre: /<pre>([\s\S]*?)<\/pre>/,
+  pageToken: /window\.pageToken\s*=\s*['"]([^'"]+)['"]/,
+  csrfToken: /window\.csrfToken\s*=\s*['"]([^'"]+)['"]/,
+  magnetControlChars: /[\x00-\x1F\x7F]/g,
+  nonAscii: /[^\x21-\x7E]/g,
+  spacesForQuery: /%20/g
+});
+
+const ATTRIBUTE_REGEX = Object.freeze({
+  class: /\bclass\s*=\s*(["'])(.*?)\1/i,
+  href: /\bhref\s*=\s*(["'])(.*?)\1/i
+});
+
 const PORT = Number(process.env.PORT || "8998");
 const APP_VERSION = "1.0.3";
 const CONFIG_DIR = process.env.CONFIG_DIR || "/config";
@@ -120,36 +170,36 @@ function saveConfig(next) {
 }
 
 function normalizeBaseUrl(s) {
-  return String(s || "").replace(/\/+$/, "");
+  return String(s || "").replace(RE.trailingSlashes, "");
 }
 
 function xmlEscape(s) {
   return String(s ?? "")
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(RE.xmlControlChars, "")
+    .replace(RE.ampersands, "&amp;")
+    .replace(RE.lessThan, "&lt;")
+    .replace(RE.greaterThan, "&gt;")
+    .replace(RE.doubleQuotes, "&quot;");
 }
 
 function htmlEscape(s) {
-  return xmlEscape(s).replace(/'/g, "&#39;");
+  return xmlEscape(s).replace(RE.singleQuotes, "&#39;");
 }
 
 function decodeEntities(s) {
   return String(s || "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&apos;/g, "'")
-    .replace(/&quot;/g, "\"")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
+    .replace(RE.nbsp, " ")
+    .replace(RE.decimalEntity, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(RE.hexEntity, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(RE.apos, "'")
+    .replace(RE.quot, """)
+    .replace(RE.lt, "<")
+    .replace(RE.gt, ">")
+    .replace(RE.amp, "&");
 }
 
 function stripTags(s) {
-  return decodeEntities(String(s || "").replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+  return decodeEntities(String(s || "").replace(RE.scripts, "").replace(RE.styles, "").replace(RE.htmlTags, " ").replace(RE.whitespace, " ").trim());
 }
 
 function pick(re, s) {
@@ -438,7 +488,7 @@ async function fetchBrowse(q, imdbId = "") {
     searchPath = `/browse/?imdb_id=${encodeURIComponent(normalizedId)}`;
   } else {
     const withAdult = config.withAdult ? "1" : "0";
-    searchPath = `/browse/?q=${encodeURIComponent(q).replace(/%20/g, "+")}&with_adult=${withAdult}`;
+    searchPath = `/browse/?q=${encodeURIComponent(q).replace(RE.spacesForQuery, "+")}&with_adult=${withAdult}`;
   }
 
   const targetUrl = baseUrl + searchPath;
@@ -477,11 +527,12 @@ async function fetchBrowse(q, imdbId = "") {
 }
 
 function getRows(html) {
-  const m = String(html || "").match(/<table[^>]*class=["'][^"']*search-table[^"']*["'][^>]*>[\s\S]*?<\/table>/i);
+  const m = String(html || "").match(RE.searchTable);
   const table = m ? m[0] : html;
 
   const rows = [];
-  const re = /<tr\b[^>]*>[\s\S]*?<\/tr>/gi;
+  const re = RE.rows;
+  re.lastIndex = 0;
   let row;
 
   while ((row = re.exec(table))) {
@@ -493,7 +544,8 @@ function getRows(html) {
 
 function getTds(row) {
   const out = [];
-  const re = /<td\b[^>]*>[\s\S]*?<\/td>/gi;
+  const re = RE.cells;
+  re.lastIndex = 0;
   let m;
 
   while ((m = re.exec(row))) {
@@ -507,13 +559,13 @@ function normalizeTitle(s) {
   return stripTags(s)
     .replace(/_/g, " ")
     .replace(/\./g, " ")
-    .replace(/\s+/g, " ")
+    .replace(RE.whitespace, " ")
     .trim();
 }
 
 function parseSizeToBytes(s) {
-  const raw = String(s || "").replace(/,/g, ".").trim();
-  const m = raw.match(/([\d.]+)\s*(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)/i);
+  const raw = String(s || "").replace(RE.commas, ".").trim();
+  const m = raw.match(RE.size);
   if (!m) return 0;
 
   const n = Number(m[1]);
@@ -542,9 +594,7 @@ function parseDateToRfc822(s, nowMs = Date.now()) {
     return new Date(nowMs - 86400 * 1000).toUTCString();
   }
 
-  const relMatch = lower.match(
-    /^(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|wk|wks|week|weeks|mo|mos|month|months|y|yr|yrs|year|years)(?:\s+ago)?$/i
-  );
+  const relMatch = lower.match(RE.relativeDate);
 
   if (relMatch) {
     const amount = Number(relMatch[1]);
@@ -587,13 +637,15 @@ function categoryFromRow(row) {
 }
 
 function attr(tag, name) {
-  const re = new RegExp(name + "\\s*=\\s*([\"'])(.*?)\\1", "i");
+  const re = ATTRIBUTE_REGEX[name];
+  if (!re) return "";
   const m = String(tag || "").match(re);
   return m ? decodeEntities(m[2]) : "";
 }
 
 function findTorrentAnchor(row) {
-  const re = /<a\b[^>]*>[\s\S]*?<\/a>/gi;
+  const re = RE.anchors;
+  re.lastIndex = 0;
   let m;
 
   while ((m = re.exec(row))) {
@@ -601,8 +653,8 @@ function findTorrentAnchor(row) {
     const cls = attr(a, "class");
     const href = attr(a, "href");
 
-    if (cls && cls.split(/\s+/).includes("torrent-title-link") && href) {
-      const text = a.replace(/<a\b[^>]*>/i, "").replace(/<\/a>/i, "");
+    if (cls && cls.split(RE.classWhitespace).includes("torrent-title-link") && href) {
+      const text = a.replace(RE.anchorOpen, "").replace(RE.anchorClose, "");
       return { href, text };
     }
   }
@@ -613,8 +665,8 @@ function findTorrentAnchor(row) {
     const a = m[0];
     const href = attr(a, "href");
 
-    if (href && /^\/.+-\d+\/?$/.test(href)) {
-      const text = a.replace(/<a\b[^>]*>/i, "").replace(/<\/a>/i, "");
+    if (href && RE.fallbackTorrentPath.test(href)) {
+      const text = a.replace(RE.anchorOpen, "").replace(RE.anchorClose, "");
       return { href, text };
     }
   }
@@ -625,6 +677,8 @@ function findTorrentAnchor(row) {
 function parseResults(html, req) {
   const rows = getRows(html);
   const items = [];
+  const baseUrl = normalizeBaseUrl(config.baseUrl);
+  const publicBase = getPublicBaseUrl(req);
 
   for (const row of rows) {
     const found = findTorrentAnchor(row);
@@ -635,8 +689,8 @@ function parseResults(html, req) {
 
     if (!title || !relPath) continue;
 
-    if (relPath.startsWith(config.baseUrl)) {
-      relPath = relPath.slice(normalizeBaseUrl(config.baseUrl).length);
+    if (relPath.startsWith(baseUrl)) {
+      relPath = relPath.slice(baseUrl.length);
     }
 
     if (!relPath.startsWith("/")) continue;
@@ -645,7 +699,7 @@ function parseResults(html, req) {
       relPath += "/";
     }
 
-    const id = relPath.replace(/\/$/, "").split("-").pop();
+    const id = relPath.replace(RE.trailingSlash, "").split("-").pop();
     if (!id || !/^\d+$/.test(id)) continue;
 
     const tds = getTds(row);
@@ -656,13 +710,12 @@ function parseResults(html, req) {
     const leechersText = tds[5] ? stripTags(tds[5]) : "0";
 
     const size = parseSizeToBytes(sizeText);
-    const seeders = Number((seedersText.replace(/,/g, "").match(/\d+/) || ["0"])[0]);
-    const leechers = Number((leechersText.replace(/,/g, "").match(/\d+/) || ["0"])[0]);
+    const seeders = Number((seedersText.replace(RE.commas, "").match(RE.number) || ["0"])[0]);
+    const leechers = Number((leechersText.replace(RE.commas, "").match(RE.number) || ["0"])[0]);
     const category = categoryFromRow(row);
 
-    const publicBase = getPublicBaseUrl(req);
     const downloadUrl = `${publicBase}/download?id=${encodeURIComponent(id)}&path=${encodeURIComponent(relPath)}`;
-    const commentsUrl = normalizeBaseUrl(config.baseUrl) + relPath;
+    const commentsUrl = baseUrl + relPath;
 
     items.push({
       id,
@@ -793,7 +846,7 @@ async function handleApi(req, res, u) {
 }
 
 function parseMagnetJson(text) {
-  const body = pick(/<pre>([\s\S]*?)<\/pre>/, text) || text;
+  const body = pick(RE.pre, text) || text;
   return JSON.parse(body);
 }
 
@@ -862,8 +915,8 @@ async function fetchMagnetOnce(relPath, id) {
   const solution = pageRes && pageRes.solution ? pageRes.solution : {};
   const page = solution.response || "";
 
-  const pageToken = pick(/window\.pageToken\s*=\s*['"]([^'"]+)['"]/, page);
-  const csrf = pick(/window\.csrfToken\s*=\s*['"]([^'"]+)['"]/, page);
+  const pageToken = pick(RE.pageToken, page);
+  const csrf = pick(RE.csrfToken, page);
 
   if (!pageToken || !csrf) {
     throw new Error("token parse failed");
@@ -899,7 +952,7 @@ function normalizeMagnet(value) {
   }
 
   // 1. Strip control characters (CR, LF, null byte, del, etc.) and trim outer whitespace
-  let magnet = value.replace(/[\x00-\x1F\x7F]/g, "").trim();
+  let magnet = value.replace(RE.magnetControlChars, "").trim();
 
   if (!magnet.startsWith("magnet:?")) {
     throw new Error("invalid magnet URI: missing magnet:? prefix");
@@ -907,7 +960,7 @@ function normalizeMagnet(value) {
 
   // 2. Percent-encode spaces and non-ASCII characters (> 127) for HTTP Location header compliance (RFC 7230 / RFC 3986).
   // Printable ASCII characters (33 to 126, including existing %3A, %2F, +, &, etc.) remain completely untouched.
-  magnet = magnet.replace(/[^\x21-\x7E]/g, (ch) => (ch === " " ? "%20" : encodeURIComponent(ch)));
+  magnet = magnet.replace(RE.nonAscii, (ch) => (ch === " " ? "%20" : encodeURIComponent(ch)));
 
   return magnet;
 }
@@ -1011,7 +1064,7 @@ async function doWarm() {
       // Warm gerçek siteye gitmeli. Lokal search cache'den dönerse Cloudflare/session sıcak tutulmaz.
       const baseUrl = normalizeBaseUrl(config.baseUrl);
       const withAdult = config.withAdult ? "1" : "0";
-      const warmCacheKey = `${baseUrl}/browse/?q=${encodeURIComponent(q).replace(/%20/g, "+")}&with_adult=${withAdult}`;
+      const warmCacheKey = `${baseUrl}/browse/?q=${encodeURIComponent(q).replace(RE.spacesForQuery, "+")}&with_adult=${withAdult}`;
       searchCache.delete(warmCacheKey);
 
       await fetchBrowse(q);
