@@ -402,26 +402,23 @@ function setLimitedCache(map, key, value, maxItems, ttlMs) {
   const now = Date.now();
 
   if (!map.has(key) && map.size >= maxItems) {
-    for (const [k, v] of map.entries()) {
-      if (now > v.expiresAt) {
-        map.delete(k);
-      }
-    }
-  }
-
-  if (!map.has(key) && map.size >= maxItems) {
     let oldestKey = null;
     let oldestTime = Infinity;
 
-    for (const [k, v] of map.entries()) {
-      const t = v.lastHitAt || v.createdAt || 0;
-      if (t < oldestTime) {
-        oldestTime = t;
-        oldestKey = k;
+    for (const [entryKey, entry] of map) {
+      if (now > entry.expiresAt) {
+        map.delete(entryKey);
+        continue;
+      }
+
+      const hitAt = entry.lastHitAt || entry.createdAt || 0;
+      if (hitAt < oldestTime) {
+        oldestTime = hitAt;
+        oldestKey = entryKey;
       }
     }
 
-    if (oldestKey) {
+    if (map.size >= maxItems && oldestKey !== null) {
       map.delete(oldestKey);
     }
   }
@@ -439,13 +436,14 @@ function getCache(map, key) {
   const item = map.get(key);
   if (!item) return null;
 
-  if (Date.now() > item.expiresAt) {
+  const now = Date.now();
+  if (now > item.expiresAt) {
     map.delete(key);
     return null;
   }
 
   item.hits++;
-  item.lastHitAt = Date.now();
+  item.lastHitAt = now;
 
   return item.value;
 }
