@@ -134,3 +134,10 @@ test("setLimitedCache: does not evict other keys when updating an existing key",
   assert.equal(map.has("a"), true);
   assert.equal(map.has("b"), true);
 });
+
+test("normalizeImdbId: accepts IMDb IDs with and without the tt prefix", () => {
+  assert.equal(srv.normalizeImdbId("tt1234567"), "tt1234567");
+  assert.equal(srv.normalizeImdbId("1234567"), "tt1234567");
+  assert.equal(srv.normalizeImdbId("TT1234567"), "tt1234567");
+  assert.throws(() => srv.normalizeImdbId("not-an-imdb-id"), /Invalid IMDb ID/);
+});
