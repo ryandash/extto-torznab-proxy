@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json ./
 COPY server.js ./
+COPY lib ./lib
 COPY --chmod=755 docker-entrypoint.sh ./
 
 ENV NODE_ENV=production
