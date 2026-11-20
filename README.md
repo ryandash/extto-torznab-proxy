@@ -2,12 +2,13 @@
 
 EXT Torznab Proxy is a self-hosted Generic Torznab gateway for EXT-style torrent search pages.
 
-It is designed for Prowlarr and uses FlareSolverr internally for Cloudflare/session handling. Users do not need to copy custom Prowlarr definition YAML files. Add it to Prowlarr as a Generic Torznab indexer.
+It is designed for Prowlarr and uses a FlareSolverr-compatible service internally for Cloudflare/session handling. Users do not need to copy custom Prowlarr definition YAML files. Add it to Prowlarr as a Generic Torznab indexer.
 
 ## Features
 
 - Generic Torznab API for Prowlarr
-- FlareSolverr session handling
+- FlareSolverr-compatible session handling
+- Configurable FlareSolverr API URL (including compatible alternatives such as Byparr)
 - Internal warm timer
 - Search result cache
 - Magnet cache
@@ -40,6 +41,7 @@ services:
       - TZ=Europe/Istanbul
       - PORT=8998
       - CONFIG_DIR=/config
+      - FLARESOLVERR_URL=${FLARESOLVERR_URL:-http://flaresolverr:8191/v1}
     ports:
       - "8998:8998"
     volumes:
@@ -51,12 +53,17 @@ services:
       retries: 3
       start_period: 60s
     restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
 ```
+
+The proxy reads `FLARESOLVERR_URL` at container startup and applies it to `/config/config.json`. When set in Docker Compose, this environment variable takes precedence over the saved web-UI setting. The default is `http://flaresolverr:8191/v1`.
+
+To use a different FlareSolverr-compatible service (for example, Byparr), point the variable at that service's API endpoint and make sure the proxy can reach it on the Docker network. For example, if the alternative service is named `byparr` in the same Compose project, set:
+
+```yaml
+- FLARESOLVERR_URL=http://byparr:8191/v1
+```
+
+Also update `depends_on` to reference `byparr` (or omit it if the service is managed outside this Compose project). The alternative must implement the FlareSolverr `/v1` request/session API used by this application.
 
 For a pinned version, use:
 
@@ -76,7 +83,7 @@ Configure:
 
 - Base URL
 - Public URL
-- FlareSolverr URL
+- FlareSolverr URL (unless overridden by `FLARESOLVERR_URL` in Docker)
 - API key
 - Warm interval
 - Cache TTLs
@@ -102,7 +109,7 @@ Redirect: disabled
 Tags: optional, for example extto
 ```
 
-Do not assign a FlareSolverr indexer proxy tag to this Generic Torznab indexer. This container handles FlareSolverr itself.
+Do not assign a FlareSolverr indexer proxy tag to this Generic Torznab indexer. This container handles the FlareSolverr-compatible service itself.
 
 ## Important endpoints
 

@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json ./
 COPY server.js ./
+COPY --chmod=755 docker-entrypoint.sh ./
 
 ENV NODE_ENV=production
 ENV CONFIG_DIR=/config
@@ -12,4 +13,4 @@ EXPOSE 8998
 
 VOLUME ["/config"]
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
