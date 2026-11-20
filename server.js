@@ -530,7 +530,7 @@ function resolveSearchInputs(params) {
   if (tokenMatch) {
     imdbId = imdbId || tokenMatch[1];
     q = "";
-  } else if (!imdbId && /^(?:tt)?\d{5,12}$/i.test(q)) {
+  } else if (/^(?:tt)?\d{5,12}$/i.test(q)) {
     imdbId = q;
     q = "";
   }
