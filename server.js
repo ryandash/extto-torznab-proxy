@@ -645,31 +645,31 @@ function findTorrentAnchor(row) {
   const re = RE.anchors;
   re.lastIndex = 0;
   let m;
+  let fallback = null;
 
   while ((m = re.exec(row))) {
-    const a = m[0];
-    const cls = attr(a, "class");
-    const href = attr(a, "href");
+    const anchor = m[0];
+    const href = attr(anchor, "href");
+    if (!href) continue;
 
-    if (cls && cls.split(RE.classWhitespace).includes("torrent-title-link") && href) {
-      const text = a.replace(RE.anchorOpen, "").replace(RE.anchorClose, "");
-      return { href, text };
+    const anchorClass = attr(anchor, "class");
+    const isTitleLink = anchorClass &&
+      anchorClass.split(RE.classWhitespace).includes("torrent-title-link");
+    const isFallbackLink = !fallback && RE.fallbackTorrentPath.test(href);
+
+    if (isTitleLink || isFallbackLink) {
+      const result = {
+        href,
+        text: anchor.replace(RE.anchorOpen, "").replace(RE.anchorClose, "")
+      };
+
+      if (isTitleLink) return result;
+      fallback = result;
     }
   }
 
-  // fallback: class yakalanamazsa torrent detay URL'sine benzeyen ilk link
-  re.lastIndex = 0;
-  while ((m = re.exec(row))) {
-    const a = m[0];
-    const href = attr(a, "href");
-
-    if (href && RE.fallbackTorrentPath.test(href)) {
-      const text = a.replace(RE.anchorOpen, "").replace(RE.anchorClose, "");
-      return { href, text };
-    }
-  }
-
-  return null;
+  // Prefer an explicitly marked title link; otherwise use the first torrent-like URL.
+  return fallback;
 }
 
 function parseResults(html, req) {
