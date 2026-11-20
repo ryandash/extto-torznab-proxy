@@ -423,11 +423,7 @@ function clearExpiredCache() {
 }
 
 const {
-  padNumberText,
-  buildTvToken,
   normalizeImdbId,
-  normalizeSearchQueryText,
-  queryHasTvToken,
   buildSearchQuery,
   resolveSearchInputs,
   mergeSearchResults
