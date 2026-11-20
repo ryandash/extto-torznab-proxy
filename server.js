@@ -192,7 +192,7 @@ function decodeEntities(s) {
     .replace(RE.decimalEntity, (_, dec) => String.fromCodePoint(Number(dec)))
     .replace(RE.hexEntity, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(RE.apos, "'")
-    .replace(RE.quot, """)
+    .replace(RE.quot, '"')
     .replace(RE.lt, "<")
     .replace(RE.gt, ">")
     .replace(RE.amp, "&");
