@@ -521,6 +521,48 @@ function buildSearchQuery(params) {
   return q;
 }
 
+function resolveSearchInputs(params) {
+  let imdbId = params.get("imdbid") || params.get("imdb_id") || "";
+  let q = String(params.get("q") || params.get("search") || "").trim();
+
+  // Prowlarr can send IMDb IDs either as a raw q value or as {ImdbId:tt...}.
+  const tokenMatch = q.match(/^\\{ImdbId:(tt\\d{5,12})\\}$/i);
+  if (tokenMatch) {
+    imdbId = imdbId || tokenMatch[1];
+    q = "";
+  } else if (!imdbId && /^(?:tt)?\\d{5,12}$/i.test(q)) {
+    imdbId = q;
+    q = "";
+  }
+
+  if (imdbId) {
+    imdbId = normalizeImdbId(imdbId);
+  }
+
+  // Preserve the legacy warm search only when neither criterion was supplied.
+  const searchQuery = q
+    ? buildSearchQuery(params)
+    : (imdbId ? "" : buildSearchQuery(params));
+
+  return { imdbId, searchQuery };
+}
+
+function mergeSearchResults(...resultSets) {
+  const seen = new Set();
+  const merged = [];
+
+  for (const items of resultSets) {
+    for (const item of items || []) {
+      const key = String(item.id || item.relPath || "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+
+  return merged;
+}
+
 async function fetchBrowse(q, imdbId = "") {
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   let searchPath;
@@ -790,7 +832,7 @@ function torznabCapsXml() {
   <server title="EXT Torznab Proxy" version="${APP_VERSION}" />
   <limits max="100" default="50" />
   <searching>
-    <search available="yes" supportedParams="q,imdbid" />
+    <search available="yes" supportedParams="q" />
     <movie-search available="yes" supportedParams="q,imdbid" />
     <tv-search available="yes" supportedParams="q,imdbid,season,ep" />
   </searching>
@@ -857,25 +899,22 @@ async function handleApi(req, res, u) {
 
   if (t === "search" || t === "movie" || t === "tvsearch") {
     try {
-      let imdbId = u.searchParams.get("imdbid") || u.searchParams.get("imdb_id") || "";
-      let q = u.searchParams.get("q") || "";
+      const { imdbId, searchQuery } = resolveSearchInputs(u.searchParams);
+      const resultSets = [];
 
-      // Prowlarr can pass IMDb IDs as a special query token.
-      if (!imdbId) {
-        const match = q.match(/^\{ImdbId:(tt\d{5,12})\}$/i);
-        if (match) {
-          imdbId = match[1];
-          q = "";
-        }
+      // Match RARBG's Torznab behavior: an IMDb ID and a title/episode query
+      // are independent criteria, so search both when Prowlarr supplies both.
+      if (searchQuery) {
+        const textHtml = await fetchBrowse(searchQuery);
+        resultSets.push(parseResults(textHtml, req));
       }
 
       if (imdbId) {
-        imdbId = normalizeImdbId(imdbId);
+        const imdbHtml = await fetchBrowse("", imdbId);
+        resultSets.push(parseResults(imdbHtml, req));
       }
 
-      const searchQuery = imdbId ? "" : buildSearchQuery(u.searchParams);
-      const html = await fetchBrowse(searchQuery, imdbId);
-      const items = parseResults(html, req);
+      const items = mergeSearchResults(...resultSets);
 
       return send(res, 200, "application/rss+xml; charset=utf-8", torznabResultsXml(items, imdbId));
     } catch (e) {
@@ -2820,6 +2859,8 @@ module.exports = {
   torznabCapsXml,
   buildSearchQuery,
   normalizeImdbId,
+  resolveSearchInputs,
+  mergeSearchResults,
   parseResults,
   setLimitedCache,
   fsCall,

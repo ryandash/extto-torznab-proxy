@@ -141,3 +141,54 @@ test("normalizeImdbId: accepts IMDb IDs with and without the tt prefix", () => {
   assert.equal(srv.normalizeImdbId("TT1234567"), "tt1234567");
   assert.throws(() => srv.normalizeImdbId("not-an-imdb-id"), /Invalid IMDb ID/);
 });
+
+
+test("torznabCapsXml: advertises IMDb IDs only for movie and TV searches", () => {
+  const xml = srv.torznabCapsXml();
+  assert.match(xml, /<search available="yes" supportedParams="q"\s*\/>/);
+  assert.match(xml, /<movie-search available="yes" supportedParams="q,imdbid"\s*\/>/);
+  assert.match(xml, /<tv-search available="yes" supportedParams="q,imdbid,season,ep"\s*\/>/);
+});
+
+test("resolveSearchInputs: accepts raw IMDb IDs in q", () => {
+  assert.deepEqual(
+    srv.resolveSearchInputs(new URLSearchParams("t=movie&q=tt0133093")),
+    { imdbId: "tt0133093", searchQuery: "" }
+  );
+  assert.deepEqual(
+    srv.resolveSearchInputs(new URLSearchParams("t=movie&q=0133093")),
+    { imdbId: "tt0133093", searchQuery: "" }
+  );
+});
+
+test("resolveSearchInputs: accepts Prowlarr IMDb query tokens", () => {
+  assert.deepEqual(
+    srv.resolveSearchInputs(new URLSearchParams("t=movie&q=%7BImdbId%3Att0133093%7D")),
+    { imdbId: "tt0133093", searchQuery: "" }
+  );
+});
+
+test("resolveSearchInputs: supports explicit imdbid with a title query", () => {
+  const result = srv.resolveSearchInputs(
+    new URLSearchParams("t=tvsearch&q=Breaking+Bad+S02E03&imdbid=tt0903747")
+  );
+  assert.equal(result.imdbId, "tt0903747");
+  assert.equal(result.searchQuery, "Breaking Bad S02E03");
+});
+
+test("resolveSearchInputs: explicit imdbid works without q", () => {
+  assert.deepEqual(
+    srv.resolveSearchInputs(new URLSearchParams("t=movie&imdbid=tt0133093")),
+    { imdbId: "tt0133093", searchQuery: "" }
+  );
+});
+
+test("mergeSearchResults: deduplicates combined title and IMDb results by torrent ID", () => {
+  const titleOnly = { id: "123", title: "The Matrix 1999" };
+  const imdbOnly = { id: "456", title: "The Matrix 1080p" };
+  const duplicate = { id: "123", title: "The Matrix 4K" };
+  assert.deepEqual(
+    srv.mergeSearchResults([titleOnly, imdbOnly], [duplicate]),
+    [titleOnly, imdbOnly]
+  );
+});
