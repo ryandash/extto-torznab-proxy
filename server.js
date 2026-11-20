@@ -833,8 +833,8 @@ function torznabCapsXml() {
   <limits max="100" default="50" />
   <searching>
     <search available="yes" supportedParams="q" />
-    <movie-search available="yes" supportedParams="q,imdbid" />
-    <tv-search available="yes" supportedParams="q,imdbid,season,ep" />
+    <movie-search available="yes" supportedParams="q,imdbid,tmdbid" />
+    <tv-search available="yes" supportedParams="q,imdbid,tmdbid,season,ep" />
   </searching>
   <categories>
     <category id="2000" name="Movies" />
