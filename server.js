@@ -526,11 +526,11 @@ function resolveSearchInputs(params) {
   let q = String(params.get("q") || params.get("search") || "").trim();
 
   // Prowlarr can send IMDb IDs either as a raw q value or as {ImdbId:tt...}.
-  const tokenMatch = q.match(/^\\{ImdbId:(tt\\d{5,12})\\}$/i);
+  const tokenMatch = q.match(/^\{ImdbId:(tt\d{5,12})\}$/i);
   if (tokenMatch) {
     imdbId = imdbId || tokenMatch[1];
     q = "";
-  } else if (!imdbId && /^(?:tt)?\\d{5,12}$/i.test(q)) {
+  } else if (!imdbId && /^(?:tt)?\d{5,12}$/i.test(q)) {
     imdbId = q;
     q = "";
   }
